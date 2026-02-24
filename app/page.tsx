@@ -224,7 +224,194 @@ function JourneyView() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   ENGAGEMENTS VIEW (second tab)
+   VERTICAL TIMELINE VIEW (second tab)
+   ═══════════════════════════════════════════════════════════════ */
+
+function VerticalTimelineView() {
+  const [expandedPhase, setExpandedPhase] = useState<string | null>(null);
+  const { checked, toggle } = useLocalChecklist();
+
+  return (
+    <div className="max-w-3xl mx-auto">
+      <div className="text-center mb-8">
+        <h2 className="text-lg font-bold text-white">End-to-End Journey</h2>
+        <p className="text-sm text-[#555] mt-1">From first lead to final deliverable — click any phase to expand</p>
+      </div>
+
+      <div className="relative">
+        {/* Vertical line */}
+        <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-500 via-purple-500 to-amber-500 opacity-30" />
+
+        {phases.map((phase, i) => {
+          const isExpanded = expandedPhase === phase.id;
+          const isLast = i === phases.length - 1;
+          const phaseChecked = checked[phase.id] || [];
+          const pct = phase.checklist.length > 0 ? Math.round((phaseChecked.length / phase.checklist.length) * 100) : 0;
+          const phaseTemplates = getTemplatesForPhase(phase.id);
+
+          return (
+            <div key={phase.id} className={`relative ${!isLast ? 'pb-2' : ''}`}>
+              {/* Dot + connector */}
+              <div className="absolute left-6 -translate-x-1/2 flex flex-col items-center z-10">
+                <button
+                  onClick={() => setExpandedPhase(isExpanded ? null : phase.id)}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center text-xl border-2 transition-all hover:scale-110 ${
+                    isExpanded
+                      ? `${phase.bgColor} ${phase.borderColor} shadow-lg shadow-purple-500/10`
+                      : pct === 100
+                      ? 'bg-green-500/10 border-green-500/30'
+                      : 'bg-[#111] border-[#333] hover:border-[#555]'
+                  }`}
+                >
+                  {pct === 100 ? '✅' : phase.icon}
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="ml-16">
+                {/* Phase header (always visible) */}
+                <button
+                  onClick={() => setExpandedPhase(isExpanded ? null : phase.id)}
+                  className={`w-full text-left p-4 rounded-xl border transition-all ${
+                    isExpanded
+                      ? `${phase.bgColor} ${phase.borderColor}`
+                      : 'bg-[#111] border-[#1a1a1a] hover:border-[#333] hover:bg-[#141414]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-bold ${isExpanded ? phase.color : 'text-[#555]'}`}>Phase {phase.number}</span>
+                        <span className="text-[#333]">·</span>
+                        <span className="text-[10px] text-[#555]">{phase.duration}</span>
+                      </div>
+                      <h3 className={`text-base font-bold mt-0.5 ${isExpanded ? 'text-white' : 'text-[#ccc]'}`}>{phase.title}</h3>
+                      <p className="text-xs text-[#666] mt-0.5">{phase.subtitle}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {/* Mini progress */}
+                      <div className="text-right">
+                        <div className="w-16 h-1.5 bg-[#222] rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all ${pct === 100 ? 'bg-green-500' : pct > 0 ? 'bg-purple-500' : ''}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <div className="text-[9px] text-[#444] mt-0.5">{phaseChecked.length}/{phase.checklist.length}</div>
+                      </div>
+                      {isExpanded ? <ChevronDown size={16} className="text-[#555]" /> : <ChevronRight size={16} className="text-[#555]" />}
+                    </div>
+                  </div>
+                </button>
+
+                {/* Expanded content */}
+                {isExpanded && (
+                  <div className="mt-3 space-y-4 pb-6">
+                    {/* Description */}
+                    <div className="bg-[#0d0d0d] border border-[#1a1a1a] rounded-lg p-4">
+                      <p className="text-sm text-[#999] leading-relaxed">{phase.description}</p>
+                    </div>
+
+                    {/* Key Activities */}
+                    <div className="bg-[#0d0d0d] border border-[#1a1a1a] rounded-lg p-4">
+                      <h4 className="text-xs font-semibold text-[#555] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <Wrench size={12} className={phase.color} /> Key Activities
+                      </h4>
+                      <div className="space-y-1.5">
+                        {phase.keyActivities.map((a, idx) => (
+                          <div key={idx} className="text-xs text-[#888] flex items-start gap-2">
+                            <span className={`${phase.color} opacity-50 mt-0.5 font-mono text-[10px]`}>{String(idx+1).padStart(2,'0')}</span>
+                            {a}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Interactive Checklist */}
+                    <div className="bg-[#0d0d0d] border border-[#1a1a1a] rounded-lg p-4">
+                      <h4 className="text-xs font-semibold text-[#555] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <CheckSquare size={12} className={phase.color} /> Checklist
+                      </h4>
+                      <div className="space-y-0.5">
+                        {phase.checklist.map((c, idx) => {
+                          const isChecked = phaseChecked.includes(c.label);
+                          return (
+                            <button key={idx} onClick={() => toggle(phase.id, c.label)}
+                              className={`w-full flex items-start gap-2 p-1.5 rounded-lg text-left transition-all ${isChecked ? 'bg-green-500/5' : 'hover:bg-white/[0.02]'}`}>
+                              <div className={`w-4 h-4 mt-0.5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-all ${isChecked ? 'bg-green-500 border-green-500' : 'border-[#333]'}`}>
+                                {isChecked && <Check size={10} className="text-white" />}
+                              </div>
+                              <div>
+                                <div className={`text-xs ${isChecked ? 'text-green-400 line-through opacity-70' : 'text-[#888]'}`}>{c.label}</div>
+                                {c.description && <div className="text-[10px] text-[#555] mt-0.5">{c.description}</div>}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Pro Tips */}
+                    <div className={`bg-[#0d0d0d] border ${phase.borderColor} rounded-lg p-4`}>
+                      <h4 className="text-xs font-semibold text-[#555] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <Lightbulb size={12} className="text-yellow-400" /> Pro Tips
+                      </h4>
+                      <div className="space-y-1.5">
+                        {phase.tips.map((t, idx) => (
+                          <div key={idx} className="text-xs text-[#999] flex items-start gap-2">
+                            <span className="text-yellow-400/50 mt-0.5">💡</span> {t}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Deliverables + Tools */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-[#0d0d0d] border border-[#1a1a1a] rounded-lg p-3">
+                        <h4 className="text-[10px] font-semibold text-[#555] uppercase tracking-wider mb-1.5">📦 Deliverables</h4>
+                        <div className="flex flex-wrap gap-1">{phase.deliverables.map((d, idx) => (<span key={idx} className="text-[10px] bg-white/5 text-[#888] px-2 py-0.5 rounded">{d}</span>))}</div>
+                      </div>
+                      <div className="bg-[#0d0d0d] border border-[#1a1a1a] rounded-lg p-3">
+                        <h4 className="text-[10px] font-semibold text-[#555] uppercase tracking-wider mb-1.5">🔧 Tools</h4>
+                        <div className="flex flex-wrap gap-1">{phase.tools.map((t, idx) => (<span key={idx} className="text-[10px] bg-white/5 text-[#888] px-2 py-0.5 rounded">{t}</span>))}</div>
+                      </div>
+                    </div>
+
+                    {/* Onsite Materials */}
+                    {phase.id === 'pre-workshop-prep' && (
+                      <div className="bg-[#0d0d0d] border border-amber-500/20 rounded-lg p-4">
+                        <h4 className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Package size={12} /> Onsite Materials</h4>
+                        <div className="space-y-1">
+                          {onsiteMaterials.map((m, idx) => (
+                            <div key={idx} className="flex items-start gap-3 text-xs py-1 border-b border-[#111] last:border-0">
+                              <span className="text-white/80 min-w-[140px]">{m.item}</span>
+                              <span className="text-[#666] min-w-[120px]">{m.quantity}</span>
+                              <span className="text-[#555]">{m.notes}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Templates */}
+                    {phaseTemplates.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-[#555] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <FileText size={12} className={phase.color} /> Templates & Prompts
+                        </h4>
+                        <div className="space-y-2">{phaseTemplates.map(t => <TemplateCard key={t.id} template={t} />)}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ENGAGEMENTS VIEW (third tab)
    ═══════════════════════════════════════════════════════════════ */
 
 const industries = [
@@ -427,7 +614,7 @@ function EngagementsView() {
    ═══════════════════════════════════════════════════════════════ */
 
 export default function HomePage() {
-  const [tab, setTab] = useState<'journey' | 'engagements'>('journey');
+  const [tab, setTab] = useState<'journey' | 'timeline' | 'engagements'>('journey');
 
   return (
     <div className="min-h-screen">
@@ -448,6 +635,12 @@ export default function HomePage() {
               }`}>
               🗺️ Journey & Playbook
             </button>
+            <button onClick={() => setTab('timeline')}
+              className={`px-5 py-2.5 text-sm font-medium rounded-t-lg transition-colors border-b-2 ${
+                tab === 'timeline' ? 'text-white border-purple-500 bg-[#111]' : 'text-[#555] border-transparent hover:text-white'
+              }`}>
+              📍 Vertical Timeline
+            </button>
             <button onClick={() => setTab('engagements')}
               className={`px-5 py-2.5 text-sm font-medium rounded-t-lg transition-colors border-b-2 ${
                 tab === 'engagements' ? 'text-white border-purple-500 bg-[#111]' : 'text-[#555] border-transparent hover:text-white'
@@ -459,7 +652,7 @@ export default function HomePage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-6 py-6">
-        {tab === 'journey' ? <JourneyView /> : <EngagementsView />}
+        {tab === 'journey' ? <JourneyView /> : tab === 'timeline' ? <VerticalTimelineView /> : <EngagementsView />}
       </div>
     </div>
   );
