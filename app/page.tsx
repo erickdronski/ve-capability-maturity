@@ -619,7 +619,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <div className="border-b border-[#222] bg-[#0a0a0a] sticky top-0 z-10">
+      <div className="border-b border-[#222] bg-[#0a0a0a] sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 py-5">
           <div className="flex items-center justify-between">
             <div>
