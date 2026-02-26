@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Plus, Users, ChevronRight, ChevronDown, FileText, X, ArrowRight, BarChart3, Copy, Check, Clock, Wrench, CheckSquare, Lightbulb, Package, MessageSquare, Trash2 } from 'lucide-react';
+import ProcessMapView from './process-map';
 import { phases, onsiteMaterials, templates, getTemplatesForPhase } from './data';
 import type { Phase, Template } from './data';
 import type { Engagement } from './lib/store';
@@ -614,7 +615,7 @@ function EngagementsView() {
    ═══════════════════════════════════════════════════════════════ */
 
 export default function HomePage() {
-  const [tab, setTab] = useState<'journey' | 'timeline' | 'engagements'>('journey');
+  const [tab, setTab] = useState<'journey' | 'timeline' | 'processmap' | 'engagements'>('journey');
 
   return (
     <div className="min-h-screen">
@@ -641,6 +642,12 @@ export default function HomePage() {
               }`}>
               📍 Vertical Timeline
             </button>
+            <button onClick={() => setTab('processmap')}
+              className={`px-5 py-2.5 text-sm font-medium rounded-t-lg transition-colors border-b-2 ${
+                tab === 'processmap' ? 'text-white border-purple-500 bg-[#111]' : 'text-[#555] border-transparent hover:text-white'
+              }`}>
+              🔀 Process Map
+            </button>
             <button onClick={() => setTab('engagements')}
               className={`px-5 py-2.5 text-sm font-medium rounded-t-lg transition-colors border-b-2 ${
                 tab === 'engagements' ? 'text-white border-purple-500 bg-[#111]' : 'text-[#555] border-transparent hover:text-white'
@@ -652,7 +659,7 @@ export default function HomePage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-6 py-6">
-        {tab === 'journey' ? <JourneyView /> : tab === 'timeline' ? <VerticalTimelineView /> : <EngagementsView />}
+        {tab === 'journey' ? <JourneyView /> : tab === 'timeline' ? <VerticalTimelineView /> : tab === 'processmap' ? <ProcessMapView /> : <EngagementsView />}
       </div>
     </div>
   );
