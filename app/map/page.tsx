@@ -468,6 +468,10 @@ export default function FullscreenMap() {
           <button onClick={() => { setPan({ x: 0, y: 0 }); setZoom(0.65); }} className="p-1.5 bg-gray-100 rounded hover:bg-gray-200 text-[10px] text-gray-500 font-medium px-2" title="Reset view">
             Reset
           </button>
+          <div className="w-px h-5 bg-gray-200 mx-1" />
+          <a href="/lucidchart-import.csv" download="cm-process-map-lucidchart.csv" className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 text-[10px] text-blue-700 font-medium" title="Download Lucidchart CSV">
+            ⬇ Lucidchart CSV
+          </a>
         </div>
       </div>
 
