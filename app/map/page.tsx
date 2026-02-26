@@ -329,6 +329,8 @@ function DetailPanel({ node, onSelectNode, onOpenTemplate, onClose }: {
 export default function FullscreenMap() {
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [showMermaid, setShowMermaid] = useState(false);
+  const [mermaidCopied, setMermaidCopied] = useState(false);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [zoom, setZoom] = useState(0.65);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -469,12 +471,9 @@ export default function FullscreenMap() {
             Reset
           </button>
           <div className="w-px h-5 bg-gray-200 mx-1" />
-          <a href="/process-map.mmd" download="cm-process-map.mmd" className="flex items-center gap-1 px-2.5 py-1.5 bg-purple-50 border border-purple-200 rounded hover:bg-purple-100 text-[10px] text-purple-700 font-medium" title="Download Mermaid code for Lucidchart">
-            ⬇ Mermaid
-          </a>
-          <a href="/lucidchart-import.csv" download="cm-process-map-lucidchart.csv" className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 text-[10px] text-blue-700 font-medium" title="Download CSV import">
-            ⬇ CSV
-          </a>
+          <button onClick={() => { setShowMermaid(true); }} className="flex items-center gap-1 px-2.5 py-1.5 bg-purple-50 border border-purple-200 rounded hover:bg-purple-100 text-[10px] text-purple-700 font-medium" title="Copy Mermaid code for Lucidchart">
+            📋 Copy for Lucidchart
+          </button>
         </div>
       </div>
 
@@ -683,6 +682,67 @@ export default function FullscreenMap() {
       </div>
 
       {selectedTemplate && <TemplateModal template={selectedTemplate} onClose={() => setSelectedTemplate(null)} />}
+
+      {/* Mermaid Copy Modal */}
+      {showMermaid && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => setShowMermaid(false)}>
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">📋 Copy to Lucidchart</h3>
+                  <p className="text-xs text-gray-500 mt-1">3 steps — takes 10 seconds</p>
+                </div>
+                <button onClick={() => setShowMermaid(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+              </div>
+              {/* Steps */}
+              <div className="flex items-center gap-4 mt-4">
+                <div className="flex items-center gap-2 bg-purple-50 border border-purple-100 rounded-lg px-3 py-2">
+                  <span className="text-sm font-bold text-purple-600">1</span>
+                  <span className="text-xs text-purple-700">Click <strong>Copy Code</strong> below</span>
+                </div>
+                <ArrowRight size={14} className="text-gray-300" />
+                <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                  <span className="text-sm font-bold text-blue-600">2</span>
+                  <span className="text-xs text-blue-700">In Lucidchart → <strong>Insert → Advanced → Mermaid</strong></span>
+                </div>
+                <ArrowRight size={14} className="text-gray-300" />
+                <div className="flex items-center gap-2 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
+                  <span className="text-sm font-bold text-green-600">3</span>
+                  <span className="text-xs text-green-700"><strong>Paste</strong> and click Generate</span>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 flex justify-between items-center bg-gray-50 border-b border-gray-100">
+              <span className="text-[10px] text-gray-400 font-mono">process-map.mmd · {nodes.length} steps · {edges.length} connections</span>
+              <button
+                onClick={() => {
+                  fetch('/process-map.mmd').then(r => r.text()).then(text => {
+                    navigator.clipboard.writeText(text);
+                    setMermaidCopied(true);
+                    setTimeout(() => setMermaidCopied(false), 3000);
+                  });
+                }}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${mermaidCopied ? 'bg-green-500 text-white' : 'bg-purple-600 text-white hover:bg-purple-500'}`}
+              >
+                {mermaidCopied ? <><Check size={14} /> Copied! Now paste in Lucidchart</> : <><Copy size={14} /> Copy Code</>}
+              </button>
+            </div>
+            <div className="overflow-y-auto max-h-[45vh]">
+              <MermaidPreview />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+/* Lazy-load the mermaid code for preview */
+function MermaidPreview() {
+  const [code, setCode] = useState<string>('Loading...');
+  useEffect(() => {
+    fetch('/process-map.mmd').then(r => r.text()).then(setCode).catch(() => setCode('Failed to load'));
+  }, []);
+  return <pre className="text-[11px] text-gray-600 whitespace-pre font-mono leading-relaxed p-5 bg-gray-50">{code}</pre>;
 }
