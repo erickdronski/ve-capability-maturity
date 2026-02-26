@@ -1,0 +1,218 @@
+flowchart LR
+
+%% ════════════════════════════════════════════
+%% C&M Workshop — End-to-End Process Map
+%% 44 steps · 62 connections · 5 swim lanes · 7 phases
+%% ════════════════════════════════════════════
+
+subgraph P1["🎯 Phase 1: Lead Intake — Day 0"]
+  direction TB
+  start(["🟢 New Lead Enters"])
+  s1a["Marketing Lead"]
+  s1b["Sales Qualified"]
+  s1c["Partner Referral"]
+  s1d{"◆ Qualify for C&M?"}
+  s1e["→ Route to VE"]
+  s1f["Assign VE Owner"]
+end
+
+subgraph P2["🔍 Phase 2: Discovery & Scheduling — Days 1-5"]
+  direction TB
+  s2a["Schedule Discovery"]
+  s2b(["★ Discovery Call"])
+  s2c{"◆ Format Decision"}
+  s2c1["Virtual"]
+  s2c2["Onsite"]
+  s2c3["Hybrid"]
+  s2d["Confirm Participants"]
+  s2e["Scope Domains"]
+  s2f[/"📄 Engagement Email"\]
+end
+
+subgraph P3["📋 Phase 3: Assessment Setup — Days 3-7"]
+  direction TB
+  s3a["Facilitator Portal"]
+  s3b["Create Assessment"]
+  s3c(["★ Generate URL"])
+  s3d[/"📄 Assessment Invite"\]
+  s3e["Complete Assessment"]
+  s3f[/"📄 Send Reminders"\]
+end
+
+subgraph P4["🧩 Phase 4: Pre-Workshop Prep — Days 7-12"]
+  direction TB
+  s4a["Download Responses"]
+  s4b(["★ Build Canvas Board"])
+  s4c["Prep Deck & Exercises"]
+  s4d["Identify Themes"]
+  s4log{"◆ Onsite Needed?"}
+  s4log1[/"📄 FedEx Supplies"\]
+  s4log2["Venue & AV"]
+  s4e["→ Brief Account Team"]
+end
+
+subgraph P5["🎪 Phase 5: Workshop Delivery — Workshop Day"]
+  direction TB
+  s5a["Welcome & Rules"]
+  s5b(["★ Present Canvas"])
+  s5c["Domain Review"]
+  s5d["Breakout Sessions"]
+  s5e["Stakeholder Input"]
+  s5f["Priority Voting"]
+  s5g(["★ Capture Everything 📸"])
+  s5h[/"📄 Thank-You Email"\]
+end
+
+subgraph P6["🔬 Phase 6: Post-Workshop Synthesis — Days 14-21"]
+  direction TB
+  s6a["Transcribe Notes"]
+  s6b[/"📄 Synthesize Themes"\]
+  s6c["Score Capabilities"]
+  s6d[/"📄 Generate Deck"\]
+  s6e(["★ Crawl/Walk/Run Roadmap"])
+  s6f["→ Internal Review"]
+end
+
+subgraph P7["🏆 Phase 7: Deliverable & Handoff — Days 21-28"]
+  direction TB
+  s7a[/"📄 Schedule Readout"\]
+  s7b(["★ Present Synthesis"])
+  s7c["Exec Approval"]
+  s7d["Share Deliverable"]
+  s7e["→ Commercial Transition"]
+  s7f["SFDC & Lessons"]
+  endnode(["🔴 Complete ✓"])
+end
+
+%% ════════════════════════════════════════════
+%% CONNECTIONS
+%% ════════════════════════════════════════════
+
+%% Phase 1 internal
+start --> s1a
+start --> s1b
+start --> s1c
+s1a --> s1d
+s1b --> s1d
+s1c --> s1d
+s1d -->|Yes| s1e
+s1e --> s1f
+
+%% Phase 1 → 2
+s1f --> s2a
+
+%% Phase 2 internal
+s2a --> s2b
+s2b --> s2c
+s2b --> s2d
+s2b --> s2e
+s2c -->|Virtual| s2c1
+s2c -->|Onsite| s2c2
+s2c -->|Hybrid| s2c3
+s2c1 --> s2f
+s2c2 --> s2f
+s2c3 --> s2f
+s2d --> s2f
+s2e --> s2f
+
+%% Phase 2 → 3
+s2f --> s3a
+
+%% Phase 2 → 4 (logistics trigger)
+s2c2 -.->|Triggers logistics| s4log
+s2c3 -.->|Triggers logistics| s4log
+
+%% Phase 3 internal
+s3a --> s3b
+s3b --> s3c
+s3c --> s3d
+s3d --> s3e
+s3d --> s3f
+s3f -.->|Reminder loop| s3e
+
+%% Phase 3 → 4
+s3e --> s4a
+
+%% Phase 4 internal
+s4a --> s4b
+s4b --> s4c
+s4b --> s4d
+s4c --> s4e
+s4d --> s4e
+s4log -->|Yes| s4log1
+s4log -->|Venue| s4log2
+s4log1 --> s4e
+s4log2 --> s4e
+
+%% Phase 4 → 5
+s4e --> s5a
+
+%% Phase 5 internal
+s5a --> s5b
+s5b --> s5c
+s5c --> s5d
+s5d --> s5e
+s5e --> s5f
+s5f --> s5g
+s5g --> s5h
+
+%% Phase 5 → 6
+s5h --> s6a
+
+%% Phase 6 internal
+s6a --> s6b
+s6b --> s6c
+s6c --> s6d
+s6d --> s6e
+s6e --> s6f
+
+%% Phase 6 → 7
+s6f --> s7a
+
+%% Phase 7 internal
+s7a --> s7b
+s7b --> s7c
+s7c --> s7d
+s7d --> s7e
+s7d --> s7f
+s7e --> endnode
+s7f --> endnode
+
+%% ════════════════════════════════════════════
+%% STYLING
+%% ════════════════════════════════════════════
+
+%% Node type styles
+classDef startEnd fill:#f0fdf4,stroke:#22c55e,stroke-width:2px,color:#15803d
+classDef action fill:#f8fafc,stroke:#94a3b8,stroke-width:1px,color:#334155
+classDef template fill:#faf5ff,stroke:#a78bfa,stroke-width:2px,color:#5b21b6
+classDef decision fill:#fffbeb,stroke:#f59e0b,stroke-width:2px,color:#92400e
+classDef milestone fill:#ecfdf5,stroke:#10b981,stroke-width:2px,color:#065f46
+classDef handoff fill:#fff1f2,stroke:#f43f5e,stroke-width:2px,color:#9f1239
+classDef endStyle fill:#fef2f2,stroke:#ef4444,stroke-width:2px,color:#991b1b
+
+%% Phase subgraph styles
+classDef phase1 fill:#eff6ff,stroke:#2563eb,stroke-width:2px,color:#1e40af
+classDef phase2 fill:#fff7ed,stroke:#ea580c,stroke-width:2px,color:#9a3412
+classDef phase3 fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#065f46
+classDef phase4 fill:#ecfeff,stroke:#0891b2,stroke-width:2px,color:#155e75
+classDef phase5 fill:#faf5ff,stroke:#7c3aed,stroke-width:2px,color:#5b21b6
+classDef phase6 fill:#fff1f2,stroke:#dc2626,stroke-width:2px,color:#991b1b
+classDef phase7 fill:#fffbeb,stroke:#d97706,stroke-width:2px,color:#92400e
+
+%% Apply node styles
+class start,endnode startEnd
+class s1a,s1b,s1c,s1f,s2a,s2c1,s2c2,s2c3,s2d,s2e,s3a,s3b,s3e,s4a,s4c,s4d,s4log2,s5a,s5c,s5d,s5e,s5f,s6a,s6c,s7c,s7d action
+class s2f,s3d,s3f,s4log1,s5h,s6b,s6d,s7a template
+class s1d,s2c,s4log decision
+class s2b,s3c,s4b,s5b,s5g,s6e,s7b milestone
+class s1e,s4e,s6f,s7e,s7f handoff
+
+%% Apply phase styles
+class P1 phase1
+class P2 phase2
+class P3 phase3
+class P4 phase4
+class P5 phase5
+class P6 phase6
+class P7 phase7

@@ -469,8 +469,11 @@ export default function FullscreenMap() {
             Reset
           </button>
           <div className="w-px h-5 bg-gray-200 mx-1" />
-          <a href="/lucidchart-import.csv" download="cm-process-map-lucidchart.csv" className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 text-[10px] text-blue-700 font-medium" title="Download Lucidchart CSV">
-            ⬇ Lucidchart CSV
+          <a href="/process-map.mmd" download="cm-process-map.mmd" className="flex items-center gap-1 px-2.5 py-1.5 bg-purple-50 border border-purple-200 rounded hover:bg-purple-100 text-[10px] text-purple-700 font-medium" title="Download Mermaid code for Lucidchart">
+            ⬇ Mermaid
+          </a>
+          <a href="/lucidchart-import.csv" download="cm-process-map-lucidchart.csv" className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 text-[10px] text-blue-700 font-medium" title="Download CSV import">
+            ⬇ CSV
           </a>
         </div>
       </div>
