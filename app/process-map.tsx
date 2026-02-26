@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { ChevronDown, ChevronRight, Copy, Check, FileText, X } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Copy, Check, X, FileText, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { templates } from './data';
 import type { Template } from './data';
 
@@ -9,133 +9,160 @@ import type { Template } from './data';
    TYPES
    ═══════════════════════════════════════════════════════════════ */
 
-type StepType = 'action' | 'template' | 'decision' | 'milestone' | 'handoff';
+type NodeType = 'start' | 'action' | 'template' | 'decision' | 'milestone' | 'handoff' | 'end';
 
-type Step = {
+type FlowNode = {
   id: string;
   label: string;
+  type: NodeType;
   lane: string;
   phase: number;
-  type: StepType;
   templateId?: string;
   description?: string;
-  connectedTo?: string[];
-};
-
-type Lane = {
-  id: string;
-  label: string;
-  color: string;
-  bgColor: string;
-  borderColor: string;
+  next: string[]; // ids of connected nodes
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   DATA
+   FLOW DATA — Full journey with connections
    ═══════════════════════════════════════════════════════════════ */
 
-const lanes: Lane[] = [
-  { id: 'sales', label: '🤝 Sales / Account Team', color: 'text-amber-400', bgColor: 'bg-amber-500/5', borderColor: 'border-amber-500/15' },
-  { id: 've-lead', label: '📋 VE Lead', color: 'text-blue-400', bgColor: 'bg-blue-500/5', borderColor: 'border-blue-500/15' },
-  { id: 've', label: '💡 Value Engineer', color: 'text-purple-400', bgColor: 'bg-purple-500/5', borderColor: 'border-purple-500/15' },
-  { id: 'customer', label: '🏢 Customer / Participants', color: 'text-green-400', bgColor: 'bg-green-500/5', borderColor: 'border-green-500/15' },
-  { id: 'logistics', label: '📦 Logistics / Ops', color: 'text-rose-400', bgColor: 'bg-rose-500/5', borderColor: 'border-rose-500/15' },
-];
+const nodes: FlowNode[] = [
+  // START
+  { id: 'start', label: 'New Lead Enters', type: 'start', lane: 'sales', phase: 1, next: ['s1a', 's1b', 's1c'] },
 
-const phaseHeaders = [
-  { num: 1, label: 'Lead Intake', icon: '🎯', color: 'text-blue-400', bg: 'bg-blue-500/10' },
-  { num: 2, label: 'Discovery', icon: '🔍', color: 'text-orange-400', bg: 'bg-orange-500/10' },
-  { num: 3, label: 'Assessment', icon: '📋', color: 'text-green-400', bg: 'bg-green-500/10' },
-  { num: 4, label: 'Pre-Workshop', icon: '🧩', color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
-  { num: 5, label: 'Workshop', icon: '🎪', color: 'text-purple-400', bg: 'bg-purple-500/10' },
-  { num: 6, label: 'Synthesis', icon: '🔬', color: 'text-rose-400', bg: 'bg-rose-500/10' },
-  { num: 7, label: 'Deliverable', icon: '🏆', color: 'text-amber-400', bg: 'bg-amber-500/10' },
-];
-
-const steps: Step[] = [
-  // Phase 1: Lead Intake
-  { id: 's1', label: 'Lead received', lane: 'sales', phase: 1, type: 'action', description: 'Marketing qualified, sales qualified, partner referral, or self-service lead enters pipeline', connectedTo: ['s2'] },
-  { id: 's2', label: 'Qualify & pitch C&M', lane: 'sales', phase: 1, type: 'action', description: 'Sales rep confirms fit for Capability & Maturity engagement', connectedTo: ['s3'] },
-  { id: 's3', label: 'Route to VE team', lane: 'sales', phase: 1, type: 'handoff', description: 'Hand off qualified lead to Value Engineering', connectedTo: ['s4'] },
-  { id: 's4', label: 'Assign VE owner', lane: 've-lead', phase: 1, type: 'action', description: 'VE Lead assigns owner and logs in Salesforce', connectedTo: ['s5'] },
-  { id: 's5', label: 'Log in Salesforce', lane: 've-lead', phase: 1, type: 'action', description: 'Create C&M opportunity type in Salesforce', connectedTo: ['s6'] },
+  // Phase 1: Lead Intake — 3 entry paths
+  { id: 's1a', label: 'Marketing Lead\n(website, event, webinar)', type: 'action', lane: 'sales', phase: 1, next: ['s1d'] },
+  { id: 's1b', label: 'Sales Qualified\n(rep pitched & qualified)', type: 'action', lane: 'sales', phase: 1, next: ['s1d'] },
+  { id: 's1c', label: 'Partner Referral\nor Self-Service', type: 'action', lane: 'sales', phase: 1, next: ['s1d'] },
+  { id: 's1d', label: 'Qualify for C&M\nEngagement', type: 'decision', lane: 'sales', phase: 1, description: 'Is this customer a fit for Capability & Maturity?', next: ['s1e'] },
+  { id: 's1e', label: 'Route to VE Team', type: 'handoff', lane: 'sales', phase: 1, next: ['s1f'] },
+  { id: 's1f', label: 'Assign VE Owner\n& Log in SFDC', type: 'action', lane: 've-lead', phase: 1, next: ['s2a'] },
 
   // Phase 2: Discovery
-  { id: 's6', label: 'Schedule discovery call', lane: 've', phase: 2, type: 'action', description: 'Schedule within 48 hours of lead assignment', connectedTo: ['s7'] },
-  { id: 's7', label: 'Run discovery call', lane: 've', phase: 2, type: 'action', description: 'Understand pain points, strategic objectives, org structure', connectedTo: ['s8', 's9'] },
-  { id: 's8', label: 'Decide workshop format', lane: 've', phase: 2, type: 'decision', description: 'Virtual (Teams/Zoom), Onsite, or Hybrid?', connectedTo: ['s10'] },
-  { id: 's9', label: 'Confirm participants', lane: 'customer', phase: 2, type: 'action', description: 'Customer champion confirms 5-12 participants with names, titles, emails', connectedTo: ['s10'] },
-  { id: 's10', label: 'Send engagement email', lane: 've', phase: 2, type: 'template', templateId: 'initial-outreach-email', description: 'Formal engagement email with agenda, logistics, and participant list', connectedTo: ['s11'] },
+  { id: 's2a', label: 'Schedule\nDiscovery Call', type: 'action', lane: 've', phase: 2, description: 'Within 48 hours of assignment', next: ['s2b'] },
+  { id: 's2b', label: 'Run Discovery\nCall', type: 'milestone', lane: 've', phase: 2, description: 'Understand pain points, objectives, org structure', next: ['s2c', 's2d', 's2e'] },
+  { id: 's2c', label: 'Workshop\nFormat?', type: 'decision', lane: 've', phase: 2, description: 'Virtual / Onsite / Hybrid', next: ['s2c1', 's2c2', 's2c3'] },
+  { id: 's2c1', label: 'Virtual\n(Teams/Zoom)', type: 'action', lane: 've', phase: 2, next: ['s2f'] },
+  { id: 's2c2', label: 'Onsite', type: 'action', lane: 've', phase: 2, next: ['s2f', 's4log'] },
+  { id: 's2c3', label: 'Hybrid', type: 'action', lane: 've', phase: 2, next: ['s2f', 's4log'] },
+  { id: 's2d', label: 'Confirm\nParticipants', type: 'action', lane: 'customer', phase: 2, description: '5-12 stakeholders with names, titles, emails', next: ['s2f'] },
+  { id: 's2e', label: 'Scope Capability\nDomains', type: 'action', lane: 've', phase: 2, next: ['s2f'] },
+  { id: 's2f', label: 'Send Engagement\nEmail', type: 'template', lane: 've', phase: 2, templateId: 'initial-outreach-email', description: 'Formal email with agenda, logistics, participants', next: ['s3a'] },
 
   // Phase 3: Assessment
-  { id: 's11', label: 'Access facilitator portal', lane: 've', phase: 3, type: 'action', description: 'Log into online assessment facilitator portal', connectedTo: ['s12'] },
-  { id: 's12', label: 'Create assessment instance', lane: 've', phase: 3, type: 'action', description: 'Configure capability domains, participant access, deadline', connectedTo: ['s13'] },
-  { id: 's13', label: 'Generate customer URL', lane: 've', phase: 3, type: 'milestone', description: 'Unique assessment link generated for distribution', connectedTo: ['s14'] },
-  { id: 's14', label: 'Send assessment invite', lane: 've', phase: 3, type: 'template', templateId: 'assessment-invitation-email', description: 'Email all participants with assessment link and deadline', connectedTo: ['s15', 's16'] },
-  { id: 's15', label: 'Complete assessment', lane: 'customer', phase: 3, type: 'action', description: 'Each participant completes 15-20 min online assessment', connectedTo: ['s18'] },
-  { id: 's16', label: 'Send reminders', lane: 've', phase: 3, type: 'template', templateId: 'assessment-reminder-email', description: 'Nudge at Day 3 and Day 5 if not complete. Target 80%+ response rate', connectedTo: ['s15'] },
+  { id: 's3a', label: 'Access Facilitator\nPortal', type: 'action', lane: 've', phase: 3, next: ['s3b'] },
+  { id: 's3b', label: 'Create Assessment\nInstance', type: 'action', lane: 've', phase: 3, description: 'Configure domains, participants, deadline', next: ['s3c'] },
+  { id: 's3c', label: 'Generate\nCustomer URL', type: 'milestone', lane: 've', phase: 3, next: ['s3d'] },
+  { id: 's3d', label: 'Send Assessment\nInvite', type: 'template', lane: 've', phase: 3, templateId: 'assessment-invitation-email', next: ['s3e', 's3f'] },
+  { id: 's3e', label: 'Complete\nAssessment', type: 'action', lane: 'customer', phase: 3, description: '15-20 min per participant', next: ['s4a'] },
+  { id: 's3f', label: 'Send Reminders\n(Day 3, Day 5)', type: 'template', lane: 've', phase: 3, templateId: 'assessment-reminder-email', description: 'Target 80%+ response rate', next: ['s3e'] },
 
   // Phase 4: Pre-Workshop
-  { id: 's18', label: 'Download responses', lane: 've', phase: 4, type: 'action', description: 'Download and review all participant assessment responses', connectedTo: ['s19'] },
-  { id: 's19', label: 'Build stakeholder canvas', lane: 've', phase: 4, type: 'milestone', description: 'Multi-stakeholder canvas board in Lucidchart/Miro showing alignment and divergence', connectedTo: ['s20', 's22'] },
-  { id: 's20', label: 'Prep facilitation deck', lane: 've', phase: 4, type: 'action', description: 'Workshop deck, breakout exercises, discussion prompts', connectedTo: ['s24'] },
-  { id: 's21', label: 'Onsite workshop?', lane: 'logistics', phase: 4, type: 'decision', description: 'If onsite or hybrid, trigger logistics workflow', connectedTo: ['s22', 's23'] },
-  { id: 's22', label: 'Order FedEx supplies', lane: 'logistics', phase: 4, type: 'template', templateId: 'fedex-shipping-checklist', description: 'Ship Capability Cards, easel pads, sticky notes, markers, etc. 5+ business days out', connectedTo: ['s24'] },
-  { id: 's23', label: 'Confirm venue & AV', lane: 'logistics', phase: 4, type: 'action', description: 'Venue, AV equipment, catering, room setup confirmed', connectedTo: ['s24'] },
-  { id: 's24', label: 'Brief account team', lane: 'sales', phase: 4, type: 'handoff', description: 'Share pre-workshop findings and themes with sales rep', connectedTo: ['s25'] },
+  { id: 's4a', label: 'Download &\nReview Responses', type: 'action', lane: 've', phase: 4, next: ['s4b'] },
+  { id: 's4b', label: 'Build Multi-Stakeholder\nCanvas Board', type: 'milestone', lane: 've', phase: 4, description: 'Lucidchart/Miro — show alignment & divergence', next: ['s4c', 's4d'] },
+  { id: 's4c', label: 'Prep Facilitation\nDeck & Exercises', type: 'action', lane: 've', phase: 4, next: ['s4e'] },
+  { id: 's4d', label: 'Identify Key\nThemes & Gaps', type: 'action', lane: 've', phase: 4, next: ['s4e'] },
+  { id: 's4log', label: 'Onsite\nLogistics?', type: 'decision', lane: 'logistics', phase: 4, next: ['s4log1', 's4log2'] },
+  { id: 's4log1', label: 'Order FedEx\nSupplies', type: 'template', lane: 'logistics', phase: 4, templateId: 'fedex-shipping-checklist', description: 'Capability Cards, easel pads, markers, etc.', next: ['s4e'] },
+  { id: 's4log2', label: 'Confirm Venue\n& AV Setup', type: 'action', lane: 'logistics', phase: 4, next: ['s4e'] },
+  { id: 's4e', label: 'Brief Account\nTeam', type: 'handoff', lane: 'sales', phase: 4, description: 'Share pre-workshop findings & themes', next: ['s5a'] },
 
   // Phase 5: Workshop
-  { id: 's25', label: 'Welcome & ground rules', lane: 've', phase: 5, type: 'action', description: 'Open session, set expectations, introduce agenda', connectedTo: ['s26'] },
-  { id: 's26', label: 'Present canvas results', lane: 've', phase: 5, type: 'milestone', description: 'Show where stakeholder perspectives align and diverge', connectedTo: ['s27'] },
-  { id: 's27', label: 'Domain-by-domain review', lane: 've', phase: 5, type: 'action', description: 'Facilitate capability discussion per domain', connectedTo: ['s28'] },
-  { id: 's28', label: 'Breakout exercises', lane: 've', phase: 5, type: 'action', description: 'Small group exercises on priority areas', connectedTo: ['s29'] },
-  { id: 's29', label: 'Participate & provide input', lane: 'customer', phase: 5, type: 'action', description: 'Stakeholders contribute perspectives, vote on priorities, co-create direction', connectedTo: ['s30'] },
-  { id: 's30', label: 'Priority voting', lane: 've', phase: 5, type: 'action', description: 'Dot voting on top 3-5 priority areas', connectedTo: ['s31'] },
-  { id: 's31', label: 'Capture all outputs', lane: 've', phase: 5, type: 'milestone', description: 'Photos of sticky notes, whiteboard, recording, chat — CAPTURE EVERYTHING', connectedTo: ['s32'] },
-  { id: 's32', label: 'Send thank-you email', lane: 've', phase: 5, type: 'template', templateId: 'post-workshop-thank-you', description: 'Same-day email with recap and next steps', connectedTo: ['s33'] },
+  { id: 's5a', label: 'Welcome &\nGround Rules', type: 'action', lane: 've', phase: 5, next: ['s5b'] },
+  { id: 's5b', label: 'Present Canvas\nResults', type: 'milestone', lane: 've', phase: 5, description: 'Show stakeholder alignment & divergence', next: ['s5c'] },
+  { id: 's5c', label: 'Domain-by-Domain\nReview', type: 'action', lane: 've', phase: 5, next: ['s5d'] },
+  { id: 's5d', label: 'Breakout\nExercises', type: 'action', lane: 've', phase: 5, next: ['s5e'] },
+  { id: 's5e', label: 'Participate &\nProvide Input', type: 'action', lane: 'customer', phase: 5, description: 'Stakeholders contribute, vote, co-create', next: ['s5f'] },
+  { id: 's5f', label: 'Priority Voting\n(Dot Vote)', type: 'action', lane: 've', phase: 5, next: ['s5g'] },
+  { id: 's5g', label: 'Capture ALL\nOutputs', type: 'milestone', lane: 've', phase: 5, description: 'Photos, recordings, sticky notes, chat', next: ['s5h'] },
+  { id: 's5h', label: 'Send Thank-You\nEmail', type: 'template', lane: 've', phase: 5, templateId: 'post-workshop-thank-you', description: 'Same-day with recap & next steps', next: ['s6a'] },
 
   // Phase 6: Synthesis
-  { id: 's33', label: 'Transcribe & organize notes', lane: 've', phase: 6, type: 'action', description: 'Transcribe recordings, organize sticky notes, consolidate all inputs', connectedTo: ['s34'] },
-  { id: 's34', label: 'Synthesize themes', lane: 've', phase: 6, type: 'template', templateId: 'workshop-notes-prompt', description: 'Use Copilot prompt to synthesize messy notes into structured themes', connectedTo: ['s35'] },
-  { id: 's35', label: 'Score capabilities', lane: 've', phase: 6, type: 'action', description: 'Score each domain based on assessment data + workshop discussion', connectedTo: ['s36'] },
-  { id: 's36', label: 'Generate skeleton deck', lane: 've', phase: 6, type: 'template', templateId: 'synthesis-deck-prompt', description: 'Use Copilot prompt to generate synthesis deck structure', connectedTo: ['s37'] },
-  { id: 's37', label: 'Build Crawl/Walk/Run roadmap', lane: 've', phase: 6, type: 'milestone', description: 'Phased roadmap: 0-6mo / 6-12mo / 12-24mo with initiatives and success metrics', connectedTo: ['s38'] },
-  { id: 's38', label: 'Internal review', lane: 'sales', phase: 6, type: 'action', description: 'Account team reviews deck before customer delivery — catch political landmines', connectedTo: ['s39'] },
+  { id: 's6a', label: 'Transcribe &\nOrganize Notes', type: 'action', lane: 've', phase: 6, next: ['s6b'] },
+  { id: 's6b', label: 'Synthesize\nThemes', type: 'template', lane: 've', phase: 6, templateId: 'workshop-notes-prompt', description: 'Copilot prompt: messy notes → structured themes', next: ['s6c'] },
+  { id: 's6c', label: 'Score\nCapabilities', type: 'action', lane: 've', phase: 6, description: 'Assessment data + workshop discussion', next: ['s6d'] },
+  { id: 's6d', label: 'Generate\nSkeleton Deck', type: 'template', lane: 've', phase: 6, templateId: 'synthesis-deck-prompt', description: 'Copilot prompt: structured synthesis deck', next: ['s6e'] },
+  { id: 's6e', label: 'Build Crawl/Walk/Run\nRoadmap', type: 'milestone', lane: 've', phase: 6, description: '0-6mo / 6-12mo / 12-24mo', next: ['s6f'] },
+  { id: 's6f', label: 'Internal Review\nw/ Account Team', type: 'handoff', lane: 'sales', phase: 6, description: 'Catch political landmines before delivery', next: ['s7a'] },
 
   // Phase 7: Deliverable
-  { id: 's39', label: 'Schedule readout', lane: 've', phase: 7, type: 'template', templateId: 'readout-meeting-invite', description: 'Book 60-90 min with all stakeholders + executive sponsors', connectedTo: ['s40'] },
-  { id: 's40', label: 'Present synthesis', lane: 've', phase: 7, type: 'milestone', description: 'Walk through capability scores, gap analysis, and roadmap', connectedTo: ['s41'] },
-  { id: 's41', label: 'Review & approve direction', lane: 'customer', phase: 7, type: 'action', description: 'Executive sponsors review roadmap and agree on priorities', connectedTo: ['s42'] },
-  { id: 's42', label: 'Share deliverable', lane: 've', phase: 7, type: 'action', description: 'Send final PDF + editable deck + follow-up email within 24 hours', connectedTo: ['s43'] },
-  { id: 's43', label: 'Commercial transition', lane: 'sales', phase: 7, type: 'handoff', description: 'Connect roadmap phases to Ivanti solutions and commercial proposals', connectedTo: ['s44'] },
-  { id: 's44', label: 'Update Salesforce', lane: 've-lead', phase: 7, type: 'action', description: 'Log outcomes, capture NPS, document lessons learned' },
+  { id: 's7a', label: 'Schedule\nReadout', type: 'template', lane: 've', phase: 7, templateId: 'readout-meeting-invite', next: ['s7b'] },
+  { id: 's7b', label: 'Present\nSynthesis', type: 'milestone', lane: 've', phase: 7, description: 'Scores, gap analysis, roadmap', next: ['s7c'] },
+  { id: 's7c', label: 'Review &\nApprove Direction', type: 'action', lane: 'customer', phase: 7, next: ['s7d'] },
+  { id: 's7d', label: 'Share Final\nDeliverable', type: 'action', lane: 've', phase: 7, description: 'PDF + editable deck within 24 hours', next: ['s7e', 's7f'] },
+  { id: 's7e', label: 'Commercial\nTransition', type: 'handoff', lane: 'sales', phase: 7, description: 'Connect roadmap to proposals', next: ['end'] },
+  { id: 's7f', label: 'Update SFDC &\nLog Lessons', type: 'action', lane: 've-lead', phase: 7, next: ['end'] },
+
+  // END
+  { id: 'end', label: 'Engagement\nComplete', type: 'end', lane: 've', phase: 7, next: [] },
 ];
 
+const lanes = [
+  { id: 'sales', label: '🤝 Sales / Account Team', color: '#f59e0b', bg: 'rgba(245,158,11,0.06)', border: 'rgba(245,158,11,0.15)' },
+  { id: 've-lead', label: '📋 VE Lead', color: '#3b82f6', bg: 'rgba(59,130,246,0.06)', border: 'rgba(59,130,246,0.15)' },
+  { id: 've', label: '💡 Value Engineer', color: '#a855f7', bg: 'rgba(168,85,247,0.06)', border: 'rgba(168,85,247,0.15)' },
+  { id: 'customer', label: '🏢 Customer', color: '#22c55e', bg: 'rgba(34,197,94,0.06)', border: 'rgba(34,197,94,0.15)' },
+  { id: 'logistics', label: '📦 Logistics', color: '#f43f5e', bg: 'rgba(244,63,94,0.06)', border: 'rgba(244,63,94,0.15)' },
+];
+
+const phaseColors = ['#3b82f6', '#f97316', '#22c55e', '#06b6d4', '#a855f7', '#f43f5e', '#f59e0b'];
+
+const typeConfig: Record<NodeType, { fill: string; stroke: string; textColor: string; shape: 'rect' | 'diamond' | 'rounded' | 'pill' }> = {
+  start: { fill: '#1a1a2e', stroke: '#22c55e', textColor: '#22c55e', shape: 'pill' },
+  action: { fill: '#161620', stroke: '#333', textColor: '#ccc', shape: 'rect' },
+  template: { fill: '#1a1028', stroke: '#a855f7', textColor: '#d8b4fe', shape: 'rect' },
+  decision: { fill: '#1a1810', stroke: '#f59e0b', textColor: '#fbbf24', shape: 'diamond' },
+  milestone: { fill: '#101a18', stroke: '#22c55e', textColor: '#86efac', shape: 'rounded' },
+  handoff: { fill: '#1a1018', stroke: '#f43f5e', textColor: '#fda4af', shape: 'rounded' },
+  end: { fill: '#1a1a2e', stroke: '#f43f5e', textColor: '#f43f5e', shape: 'pill' },
+};
+
 /* ═══════════════════════════════════════════════════════════════
-   COMPONENTS
+   LAYOUT ENGINE — Position nodes in a grid
    ═══════════════════════════════════════════════════════════════ */
 
-const typeStyles: Record<StepType, { bg: string; border: string; icon: string }> = {
-  action: { bg: 'bg-[#161616]', border: 'border-[#2a2a2a]', icon: '▸' },
-  template: { bg: 'bg-purple-500/8', border: 'border-purple-500/25', icon: '📄' },
-  decision: { bg: 'bg-amber-500/8', border: 'border-amber-500/25', icon: '◆' },
-  milestone: { bg: 'bg-green-500/8', border: 'border-green-500/25', icon: '★' },
-  handoff: { bg: 'bg-rose-500/8', border: 'border-rose-500/25', icon: '→' },
-};
+const NODE_W = 150;
+const NODE_H = 70;
+const PHASE_GAP = 180;
+const LANE_GAP = 100;
+const MARGIN_LEFT = 180;
+const MARGIN_TOP = 80;
 
-const typeLabels: Record<StepType, { label: string; color: string }> = {
-  action: { label: 'Step', color: 'text-[#666]' },
-  template: { label: 'Template', color: 'text-purple-400' },
-  decision: { label: 'Decision', color: 'text-amber-400' },
-  milestone: { label: 'Milestone', color: 'text-green-400' },
-  handoff: { label: 'Handoff', color: 'text-rose-400' },
-};
+function layoutNodes() {
+  const positions: Record<string, { x: number; y: number }> = {};
+  const laneIndex: Record<string, number> = {};
+  lanes.forEach((l, i) => { laneIndex[l.id] = i; });
+
+  // Group by phase and lane, track column positions within each phase
+  const phaseLaneCounts: Record<string, number> = {};
+
+  // Sort nodes by phase, then by connection order
+  const sorted = [...nodes];
+
+  sorted.forEach(node => {
+    const li = laneIndex[node.lane] ?? 2;
+    const key = `${node.phase}-${node.lane}`;
+    const col = phaseLaneCounts[key] || 0;
+    phaseLaneCounts[key] = col + 1;
+
+    const x = MARGIN_LEFT + (node.phase - 1) * PHASE_GAP + col * (NODE_W + 20);
+    const y = MARGIN_TOP + li * LANE_GAP;
+
+    positions[node.id] = { x, y };
+  });
+
+  return positions;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SVG COMPONENTS
+   ═══════════════════════════════════════════════════════════════ */
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const copy = () => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); };
   return (
-    <button onClick={copy} className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${copied ? 'bg-green-500/20 text-green-400' : 'bg-white/5 text-[#888] hover:bg-white/10'}`}>
+    <button onClick={copy} className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium ${copied ? 'bg-green-500/20 text-green-400' : 'bg-white/5 text-[#888] hover:bg-white/10'}`}>
       {copied ? <Check size={10} /> : <Copy size={10} />} {copied ? 'Copied' : 'Copy'}
     </button>
   );
@@ -143,7 +170,7 @@ function CopyButton({ text }: { text: string }) {
 
 function TemplateModal({ template, onClose }: { template: Template; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-[#111] border border-[#222] rounded-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-[#222]">
           <div>
@@ -161,177 +188,310 @@ function TemplateModal({ template, onClose }: { template: Template; onClose: () 
   );
 }
 
-function StepTile({ step, onClick }: { step: Step; onClick?: () => void }) {
-  const style = typeStyles[step.type];
-  const label = typeLabels[step.type];
-  const hasTemplate = step.type === 'template' && step.templateId;
-  const hasConnections = step.connectedTo && step.connectedTo.length > 0;
-
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full text-left p-3 rounded-lg border-2 ${style.bg} ${style.border} transition-all hover:scale-[1.02] hover:brightness-110 ${hasTemplate ? 'cursor-pointer ring-1 ring-purple-500/10' : ''}`}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-xs">{style.icon}</span>
-            <span className={`text-[9px] font-bold uppercase tracking-wider ${label.color}`}>{label.label}</span>
-            {hasTemplate && <FileText size={10} className="text-purple-400" />}
-          </div>
-          <div className="text-xs font-semibold text-white leading-tight">{step.label}</div>
-          {step.description && (
-            <div className="text-[10px] text-[#666] mt-1 leading-relaxed line-clamp-2">{step.description}</div>
-          )}
-        </div>
-        {hasConnections && (
-          <div className="text-[#333] mt-1 flex-shrink-0">
-            <ChevronRight size={12} />
-          </div>
-        )}
-      </div>
-    </button>
-  );
-}
-
 /* ═══════════════════════════════════════════════════════════════
-   MAIN PROCESS MAP
+   MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════ */
 
 export default function ProcessMapView() {
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
-  const [hoveredStep, setHoveredStep] = useState<string | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(0.85);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const handleStepClick = (step: Step) => {
-    if (step.templateId) {
-      const tmpl = templates.find(t => t.id === step.templateId);
+  const positions = layoutNodes();
+
+  // Calculate SVG dimensions
+  const maxX = Math.max(...Object.values(positions).map(p => p.x)) + NODE_W + 100;
+  const maxY = Math.max(...Object.values(positions).map(p => p.y)) + NODE_H + 100;
+
+  const handleNodeClick = (node: FlowNode) => {
+    if (node.templateId) {
+      const tmpl = templates.find(t => t.id === node.templateId);
       if (tmpl) setSelectedTemplate(tmpl);
     }
   };
 
+  // Get connected nodes for highlighting
+  const getConnected = (nodeId: string): Set<string> => {
+    const set = new Set<string>();
+    const node = nodes.find(n => n.id === nodeId);
+    if (node) {
+      node.next.forEach(id => set.add(id));
+      // Also find nodes that connect TO this node
+      nodes.forEach(n => {
+        if (n.next.includes(nodeId)) set.add(n.id);
+      });
+    }
+    return set;
+  };
+
+  const connectedNodes = hoveredNode ? getConnected(hoveredNode) : new Set<string>();
+
+  // Pan handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button === 0 && e.target === e.currentTarget) {
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+    }
+  };
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isPanning) {
+      setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
+    }
+  };
+  const handleMouseUp = () => setIsPanning(false);
+
+  // Draw connection line between two positions
+  const drawConnection = (fromId: string, toId: string, index: number) => {
+    const from = positions[fromId];
+    const to = positions[toId];
+    if (!from || !to) return null;
+
+    const x1 = from.x + NODE_W / 2;
+    const y1 = from.y + NODE_H / 2;
+    const x2 = to.x + NODE_W / 2;
+    const y2 = to.y + NODE_H / 2;
+
+    // Determine exit/entry points
+    const fx = from.x + NODE_W;
+    const fy = from.y + NODE_H / 2;
+    const tx = to.x;
+    const ty = to.y + NODE_H / 2;
+
+    const isHighlighted = hoveredNode === fromId || hoveredNode === toId;
+    const isHovered = hoveredNode && !isHighlighted;
+
+    // Bezier curve
+    const dx = Math.abs(tx - fx);
+    const cp = Math.max(dx * 0.4, 30);
+    const path = `M ${fx} ${fy} C ${fx + cp} ${fy}, ${tx - cp} ${ty}, ${tx} ${ty}`;
+
+    return (
+      <g key={`${fromId}-${toId}-${index}`}>
+        <path
+          d={path}
+          fill="none"
+          stroke={isHighlighted ? '#a855f7' : '#333'}
+          strokeWidth={isHighlighted ? 2 : 1}
+          opacity={isHovered ? 0.15 : isHighlighted ? 1 : 0.4}
+          markerEnd={`url(#arrow${isHighlighted ? '-active' : ''})`}
+        />
+      </g>
+    );
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Legend */}
+    <div className="space-y-4">
+      {/* Controls */}
       <div className="bg-[#111] border border-[#222] rounded-xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-bold text-white">Process Map — Capability & Maturity Framework</h2>
-          <div className="text-[10px] text-[#555]">{steps.length} steps across {phaseHeaders.length} phases</div>
-        </div>
-        <div className="flex items-center gap-4 flex-wrap">
-          {Object.entries(typeStyles).map(([type, style]) => (
-            <div key={type} className="flex items-center gap-1.5">
-              <div className={`w-3 h-3 rounded ${style.bg} border ${style.border}`} />
-              <span className={`text-[10px] ${typeLabels[type as StepType].color}`}>{typeLabels[type as StepType].label}</span>
-            </div>
-          ))}
-          <div className="text-[#333]">|</div>
-          <div className="text-[10px] text-[#555]">💡 Click purple tiles to view templates</div>
-        </div>
-      </div>
-
-      {/* Swim Lane Diagram */}
-      <div className="overflow-x-auto pb-4">
-        <div className="min-w-[1400px]">
-          {/* Phase Headers */}
-          <div className="grid gap-1 mb-2" style={{ gridTemplateColumns: '160px repeat(7, 1fr)' }}>
-            <div className="p-2 text-[10px] text-[#444] font-semibold uppercase tracking-wider flex items-center">Roles ↓ / Phases →</div>
-            {phaseHeaders.map(ph => (
-              <div key={ph.num} className={`p-2 rounded-lg ${ph.bg} text-center`}>
-                <div className="text-base mb-0.5">{ph.icon}</div>
-                <div className={`text-[10px] font-bold ${ph.color}`}>Phase {ph.num}</div>
-                <div className="text-[9px] text-[#666]">{ph.label}</div>
-              </div>
-            ))}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-white">🔀 Process Flow Map</h2>
+            <p className="text-[10px] text-[#555] mt-0.5">{nodes.length} steps · {nodes.reduce((s, n) => s + n.next.length, 0)} connections · Hover to trace flow · Click purple nodes for templates</p>
           </div>
+          <div className="flex items-center gap-2">
+            {/* Legend */}
+            <div className="flex items-center gap-3 mr-4">
+              {Object.entries(typeConfig).filter(([k]) => !['start', 'end'].includes(k)).map(([type, cfg]) => (
+                <div key={type} className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded-sm" style={{ background: cfg.fill, border: `1px solid ${cfg.stroke}` }} />
+                  <span className="text-[9px]" style={{ color: cfg.textColor }}>{type}</span>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setZoom(z => Math.min(z + 0.15, 2))} className="p-1.5 bg-[#1a1a1a] rounded hover:bg-[#222]"><ZoomIn size={14} className="text-[#888]" /></button>
+            <button onClick={() => setZoom(z => Math.max(z - 0.15, 0.3))} className="p-1.5 bg-[#1a1a1a] rounded hover:bg-[#222]"><ZoomOut size={14} className="text-[#888]" /></button>
+            <button onClick={() => { setZoom(0.85); setPan({ x: 0, y: 0 }); }} className="p-1.5 bg-[#1a1a1a] rounded hover:bg-[#222]"><Maximize2 size={14} className="text-[#888]" /></button>
+            <span className="text-[10px] text-[#555] ml-1">{Math.round(zoom * 100)}%</span>
+          </div>
+        </div>
+      </div>
 
-          {/* Lanes */}
-          {lanes.map((lane) => {
+      {/* Canvas */}
+      <div
+        ref={containerRef}
+        className="bg-[#0a0a0a] border border-[#222] rounded-xl overflow-hidden cursor-grab active:cursor-grabbing"
+        style={{ height: '70vh' }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
+        <svg
+          width="100%"
+          height="100%"
+          viewBox={`${-pan.x / zoom} ${-pan.y / zoom} ${(containerRef.current?.clientWidth || 1200) / zoom} ${(containerRef.current?.clientHeight || 700) / zoom}`}
+        >
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#555" />
+            </marker>
+            <marker id="arrow-active" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#a855f7" />
+            </marker>
+          </defs>
+
+          {/* Lane backgrounds */}
+          {lanes.map((lane, i) => (
+            <g key={lane.id}>
+              <rect
+                x={0}
+                y={MARGIN_TOP + i * LANE_GAP - LANE_GAP * 0.35}
+                width={maxX}
+                height={LANE_GAP * 0.7}
+                fill={lane.bg}
+                rx={8}
+              />
+              <text x={12} y={MARGIN_TOP + i * LANE_GAP + 5} fill={lane.color} fontSize={11} fontWeight="bold" fontFamily="system-ui">
+                {lane.label}
+              </text>
+            </g>
+          ))}
+
+          {/* Phase column headers */}
+          {[1, 2, 3, 4, 5, 6, 7].map((p, i) => {
+            const labels = ['Lead Intake', 'Discovery', 'Assessment', 'Pre-Workshop', 'Workshop', 'Synthesis', 'Deliverable'];
+            const icons = ['🎯', '🔍', '📋', '🧩', '🎪', '🔬', '🏆'];
             return (
-              <div
-                key={lane.id}
-                className={`grid gap-1 mb-1 ${lane.bgColor} rounded-lg border ${lane.borderColor}`}
-                style={{ gridTemplateColumns: '160px repeat(7, 1fr)' }}
+              <g key={p}>
+                <rect
+                  x={MARGIN_LEFT + i * PHASE_GAP - 10}
+                  y={10}
+                  width={NODE_W + 20}
+                  height={30}
+                  fill={`${phaseColors[i]}15`}
+                  stroke={`${phaseColors[i]}30`}
+                  rx={6}
+                />
+                <text x={MARGIN_LEFT + i * PHASE_GAP + NODE_W / 2} y={30} fill={phaseColors[i]} fontSize={10} fontWeight="bold" textAnchor="middle" fontFamily="system-ui">
+                  {icons[i]} Phase {p}: {labels[i]}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Connection lines (draw first, behind nodes) */}
+          {nodes.flatMap(node =>
+            node.next.map((targetId, i) => drawConnection(node.id, targetId, i))
+          )}
+
+          {/* Nodes */}
+          {nodes.map(node => {
+            const pos = positions[node.id];
+            if (!pos) return null;
+            const cfg = typeConfig[node.type];
+            const isHovered = hoveredNode === node.id;
+            const isConnected = connectedNodes.has(node.id);
+            const isDimmed = hoveredNode && !isHovered && !isConnected;
+            const hasTemplate = node.type === 'template' && node.templateId;
+
+            const w = (node.type as string) === 'diamond' ? NODE_W * 0.85 : NODE_W;
+            const h = NODE_H;
+
+            return (
+              <g
+                key={node.id}
+                transform={`translate(${pos.x}, ${pos.y})`}
+                onMouseEnter={() => setHoveredNode(node.id)}
+                onMouseLeave={() => setHoveredNode(null)}
+                onClick={() => handleNodeClick(node)}
+                style={{ cursor: hasTemplate ? 'pointer' : 'default', opacity: isDimmed ? 0.2 : 1, transition: 'opacity 0.2s' }}
               >
-                {/* Lane Label */}
-                <div className="p-3 flex items-center">
-                  <div>
-                    <div className={`text-xs font-bold ${lane.color}`}>{lane.label}</div>
-                  </div>
-                </div>
-
-                {/* Phase Cells */}
-                {phaseHeaders.map(ph => {
-                  const cellSteps = steps.filter(s => s.lane === lane.id && s.phase === ph.num);
-                  return (
-                    <div key={ph.num} className="p-2 min-h-[80px] flex flex-col gap-1.5">
-                      {cellSteps.map(step => (
-                        <StepTile
-                          key={step.id}
-                          step={step}
-                          onClick={() => handleStepClick(step)}
-                        />
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Flow Summary */}
-      <div className="bg-[#111] border border-[#222] rounded-xl p-5">
-        <h3 className="text-xs font-semibold text-[#555] uppercase tracking-wider mb-3">📊 Process Flow Summary</h3>
-        <div className="grid grid-cols-7 gap-3">
-          {phaseHeaders.map(ph => {
-            const phaseSteps = steps.filter(s => s.phase === ph.num);
-            const templateCount = phaseSteps.filter(s => s.type === 'template').length;
-            const decisionCount = phaseSteps.filter(s => s.type === 'decision').length;
-            const milestoneCount = phaseSteps.filter(s => s.type === 'milestone').length;
-            return (
-              <div key={ph.num} className="text-center">
-                <div className="text-base mb-1">{ph.icon}</div>
-                <div className={`text-xs font-bold ${ph.color}`}>{ph.label}</div>
-                <div className="text-[10px] text-[#555] mt-1">{phaseSteps.length} steps</div>
-                <div className="flex items-center justify-center gap-2 mt-1">
-                  {templateCount > 0 && <span className="text-[9px] text-purple-400">{templateCount} 📄</span>}
-                  {decisionCount > 0 && <span className="text-[9px] text-amber-400">{decisionCount} ◆</span>}
-                  {milestoneCount > 0 && <span className="text-[9px] text-green-400">{milestoneCount} ★</span>}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Connection Map */}
-      <div className="bg-[#111] border border-[#222] rounded-xl p-5">
-        <h3 className="text-xs font-semibold text-[#555] uppercase tracking-wider mb-3">🔗 Key Handoffs & Connections</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {steps.filter(s => s.type === 'handoff').map(step => {
-            const targets = step.connectedTo?.map(id => steps.find(s => s.id === id)).filter(Boolean) || [];
-            return (
-              <div key={step.id} className="bg-rose-500/5 border border-rose-500/15 rounded-lg p-3">
-                <div className="text-xs font-semibold text-rose-400 mb-1">→ {step.label}</div>
-                <div className="text-[10px] text-[#888]">{step.description}</div>
-                {targets.length > 0 && (
-                  <div className="mt-2 flex items-center gap-1 text-[10px] text-[#555]">
-                    Leads to: {targets.map((t, i) => (
-                      <span key={i} className="text-white/70 bg-white/5 px-1.5 py-0.5 rounded">{t!.label}</span>
-                    ))}
-                  </div>
+                {/* Node shape */}
+                {cfg.shape === 'diamond' ? (
+                  <g transform={`translate(${w / 2}, ${h / 2})`}>
+                    <rect
+                      x={-w * 0.4}
+                      y={-h * 0.4}
+                      width={w * 0.8}
+                      height={h * 0.8}
+                      fill={cfg.fill}
+                      stroke={isHovered ? '#fff' : cfg.stroke}
+                      strokeWidth={isHovered ? 2 : 1}
+                      rx={4}
+                      transform="rotate(45)"
+                    />
+                  </g>
+                ) : cfg.shape === 'pill' ? (
+                  <rect
+                    width={w}
+                    height={h}
+                    fill={cfg.fill}
+                    stroke={isHovered ? '#fff' : cfg.stroke}
+                    strokeWidth={isHovered ? 2 : 1.5}
+                    rx={h / 2}
+                  />
+                ) : (
+                  <rect
+                    width={w}
+                    height={h}
+                    fill={cfg.fill}
+                    stroke={isHovered ? '#fff' : cfg.stroke}
+                    strokeWidth={isHovered ? 2 : 1}
+                    rx={cfg.shape === 'rounded' ? 12 : 6}
+                  />
                 )}
-              </div>
+
+                {/* Template icon */}
+                {hasTemplate && (
+                  <g transform={`translate(${w - 16}, 4)`}>
+                    <rect width={12} height={12} rx={2} fill="#a855f7" opacity={0.3} />
+                    <text x={6} y={10} fill="#d8b4fe" fontSize={8} textAnchor="middle" fontFamily="system-ui">📄</text>
+                  </g>
+                )}
+
+                {/* Label */}
+                {node.label.split('\n').map((line, i, arr) => (
+                  <text
+                    key={i}
+                    x={w / 2}
+                    y={h / 2 + (i - (arr.length - 1) / 2) * 13}
+                    fill={isHovered ? '#fff' : cfg.textColor}
+                    fontSize={10}
+                    fontWeight={isHovered ? 'bold' : 'normal'}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontFamily="system-ui"
+                  >
+                    {line}
+                  </text>
+                ))}
+
+                {/* Connection count badge */}
+                {node.next.length > 1 && (
+                  <g transform={`translate(${w - 4}, ${h - 4})`}>
+                    <circle r={8} fill="#222" stroke="#555" strokeWidth={1} />
+                    <text x={0} y={1} fill="#888" fontSize={8} textAnchor="middle" dominantBaseline="middle" fontFamily="system-ui">
+                      {node.next.length}
+                    </text>
+                  </g>
+                )}
+              </g>
             );
           })}
-        </div>
+        </svg>
       </div>
+
+      {/* Tooltip for hovered node */}
+      {hoveredNode && (() => {
+        const node = nodes.find(n => n.id === hoveredNode);
+        if (!node || !node.description) return null;
+        return (
+          <div className="bg-[#111] border border-[#333] rounded-lg p-3 mt-2">
+            <div className="text-xs font-semibold text-white">{node.label.replace('\n', ' ')}</div>
+            <div className="text-[10px] text-[#888] mt-1">{node.description}</div>
+            <div className="text-[9px] text-[#555] mt-1">
+              → Connects to: {node.next.length > 0 ? node.next.map(id => nodes.find(n => n.id === id)?.label.replace('\n', ' ')).join(' · ') : 'None (end)'}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Template Modal */}
-      {selectedTemplate && (
-        <TemplateModal template={selectedTemplate} onClose={() => setSelectedTemplate(null)} />
-      )}
+      {selectedTemplate && <TemplateModal template={selectedTemplate} onClose={() => setSelectedTemplate(null)} />}
     </div>
   );
 }
