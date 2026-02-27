@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Plus, Users, ChevronRight, ChevronDown, FileText, X, ArrowRight, BarChart3, Copy, Check, Clock, Wrench, CheckSquare, Lightbulb, Package, MessageSquare, Trash2 } from 'lucide-react';
 import ProcessMapView from './process-map';
+import ProductGuideView from './product-guide';
 import { phases, onsiteMaterials, templates, getTemplatesForPhase } from './data';
 import type { Phase, Template } from './data';
 import type { Engagement } from './lib/store';
@@ -589,7 +590,7 @@ function EngagementsView() {
    ═══════════════════════════════════════════════════════════════ */
 
 export default function HomePage() {
-  const [tab, setTab] = useState<'journey' | 'timeline' | 'processmap' | 'engagements'>('journey');
+  const [tab, setTab] = useState<'journey' | 'timeline' | 'processmap' | 'engagements' | 'products'>('journey');
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -608,6 +609,7 @@ export default function HomePage() {
               { key: 'timeline' as const, label: '📍 Vertical Timeline' },
               { key: 'processmap' as const, label: '🔀 Process Map' },
               { key: 'engagements' as const, label: '📋 Customer Engagements' },
+              { key: 'products' as const, label: '📦 Product Guide' },
             ]).map(t => (
               <button key={t.key} onClick={() => setTab(t.key)}
                 className={`px-5 py-2.5 text-sm font-medium rounded-t-lg transition-colors border-b-2 ${
@@ -621,7 +623,7 @@ export default function HomePage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-6 py-6">
-        {tab === 'journey' ? <JourneyView /> : tab === 'timeline' ? <VerticalTimelineView /> : tab === 'processmap' ? <ProcessMapView /> : <EngagementsView />}
+        {tab === 'journey' ? <JourneyView /> : tab === 'timeline' ? <VerticalTimelineView /> : tab === 'processmap' ? <ProcessMapView /> : tab === 'products' ? <ProductGuideView /> : <EngagementsView />}
       </div>
     </div>
   );
